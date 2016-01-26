@@ -28,6 +28,16 @@ func ParseNodeID(nodeID string) (NodeID, error) {
 	return n, nil
 }
 
+// Parses a node ID. Panics on failure.
+func MustParseNodeID(nodeID string) NodeID {
+	n, err := ParseNodeID(nodeID)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse node ID: %v", err))
+	}
+
+	return n
+}
+
 // Unmarshal from a hexadecimal node ID string.
 func (nid *NodeID) UnmarshalString(s string) error {
 	b, err := hex.DecodeString(s)
