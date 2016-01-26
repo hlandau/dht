@@ -1,13 +1,18 @@
 package krpc
 
-import "net"
-import "crypto/rand"
-import "sync/atomic"
-import "github.com/zeebo/bencode"
-import denet "github.com/hlandau/degoutils/net"
-import "encoding/binary"
-import "bytes"
-import "reflect"
+import (
+	"bytes"
+	"crypto/rand"
+	"encoding/binary"
+	denet "github.com/hlandau/degoutils/net"
+	"github.com/hlandau/xlog"
+	"github.com/zeebo/bencode"
+	"net"
+	"reflect"
+	"sync/atomic"
+)
+
+var log, Log = xlog.New("dht.krpc")
 
 // KRPC message.
 type Message struct {
@@ -22,6 +27,8 @@ type Message struct {
 	Response_ bencode.RawMessage `bencode:"r,omitempty"` // (Internal use only.)
 
 	Error []interface{} `bencode:"e,omitempty"` // Error responses: error information.
+
+	IP Endpoint `bencode:"ip,omitempty"`
 }
 
 // Send a query to a host.

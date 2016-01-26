@@ -1,8 +1,10 @@
 package dht
 
-import "net"
-import "container/ring"
-import "github.com/golang/groupcache/lru"
+import (
+	"container/ring"
+	"github.com/golang/groupcache/lru"
+	"net"
+)
 
 // Stores values. Specific to an infohash.
 type peerSet struct {

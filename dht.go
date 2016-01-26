@@ -12,12 +12,13 @@ import (
 	"time"
 )
 
-var log, Log = xlog.New("dht")
+var log, Log = xlog.NewQuiet("dht")
 
 // DHT structure, setup and teardown. {{{1
 
 type DHT struct {
-	cfg Config
+	cfg      Config
+	wantList []string
 
 	// Requests from the client.
 	addNodeChan               chan addNodeInfo
@@ -79,6 +80,10 @@ func New(cfg *Config) (*DHT, error) {
 		peerStore:         newPeerStore(cfg.MaxInfoHashes, cfg.MaxInfoHashPeers),
 		tokenStore:        newTokenStore(),
 		locallyOriginated: map[InfoHash]struct{}{},
+	}
+
+	if dht.cfg.AnyPeerAF {
+		dht.wantList = []string{"n4", "n6"}
 	}
 
 	// Create UDP socket.
@@ -254,7 +259,7 @@ func (dht *DHT) lRequestPeers(infoHash InfoHash, announce bool) error {
 		dht.lSetLocallyOriginated(infoHash, true)
 	}
 
-	if dht.peerStore.Count(infoHash) < dht.cfg.MaxInfoHashPeers {
+	if dht.peerStore.Count(infoHash) < dht.cfg.NumTargetPeers {
 		dht.lRequestPeersActual(infoHash)
 	}
 

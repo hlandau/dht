@@ -275,6 +275,15 @@ func (dht *DHT) lRxGetPeersRes(v *krGetPeersRes, msg *krpc.Message, addr net.UDP
 			continue
 		}
 
+		if !isValidAddress(nodeLocator.Addr) {
+			// Ignore invalid addresses.
+			continue
+		}
+
+		if dht.peerStore.Count(infoHash) >= dht.cfg.NumTargetPeers {
+			break
+		}
+
 		// Ignore items already in the routing table.
 		n2 := dht.neighbourhood.routingTable.FindByAddress(nodeLocator.Addr)
 		if n2 != nil {
@@ -288,19 +297,21 @@ func (dht *DHT) lRxGetPeersRes(v *krGetPeersRes, msg *krpc.Message, addr net.UDP
 
 		n2, _ = dht.neighbourhood.routingTable.Node(nodeLocator.NodeID, nodeLocator.Addr)
 
-		// Re-add the request to the queue.
-		//
-		// Announce has already been recorded via PeerStore.MarkLocallyOriginated,
-		// so it can be set to false here.
-		select {
-		case dht.requestPeersChan <- requestPeersInfo{
-			InfoHash: infoHash,
-			Announce: false,
-		}:
-		default:
-			// Channel full. The peer was already added to the routing table and will be
-			// used the next time RequestPeers is called if it is close enough to the
-			// infohash.
+		if dht.peerStore.Count(infoHash) < dht.cfg.NumTargetPeers {
+			// Re-add the request to the queue.
+			//
+			// Announce has already been recorded via PeerStore.MarkLocallyOriginated,
+			// so it can be set to false here.
+			select {
+			case dht.requestPeersChan <- requestPeersInfo{
+				InfoHash: infoHash,
+				Announce: false,
+			}:
+			default:
+				// Channel full. The peer was already added to the routing table and will be
+				// used the next time RequestPeers is called if it is close enough to the
+				// infohash.
+			}
 		}
 	}
 

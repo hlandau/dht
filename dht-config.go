@@ -8,7 +8,7 @@ type Config struct {
 	Address string `usage:"Address to bind on"`
 
 	// Number of peers that DHT will try to find for every infohash being searched.
-	// Default: 5.
+	// Default: 50.
 	NumTargetPeers int `usage:"Maximum number of peers to retrieve for an infohash"`
 
 	// Minimum number of nodes. Default: 16.
@@ -41,11 +41,15 @@ type Config struct {
 
 	// Node ID. A random Node ID is generated if this is left blank.
 	NodeID NodeID `usage:"Node ID"`
+
+	// If not set, request peers only of the address family (IPv4 or IPv6) used to make
+	// requests. If set, request peers of all supported address families (IPv4, IPv6).
+	AnyPeerAF bool `usage:"Return peers of all address families"`
 }
 
 func (cfg *Config) setDefaults() {
 	if cfg.NumTargetPeers == 0 {
-		cfg.NumTargetPeers = 5
+		cfg.NumTargetPeers = 50
 	}
 
 	if cfg.MinNodes == 0 {

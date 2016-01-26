@@ -1,7 +1,9 @@
 package dht
 
-import "encoding/hex"
-import "fmt"
+import (
+	"encoding/hex"
+	"fmt"
+)
 
 // Info hash. Binary form.
 type InfoHash string

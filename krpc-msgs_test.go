@@ -1,7 +1,11 @@
 package dht
 
-import "testing"
-import "github.com/hlandau/degoutils/net/dht/krpc"
+import (
+	"github.com/hlandau/dht/krpc"
+	"github.com/zeebo/bencode"
+	"reflect"
+	"testing"
+)
 
 type test struct {
 	B      string
@@ -67,6 +71,27 @@ func TestKRPC(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot decode response part: %v", err)
 			}
+		}
+
+		b, err := bencode.EncodeBytes(msg)
+		if err != nil {
+			t.Fatalf("couldn't encode: %v", err)
+		}
+
+		msg2, err := krpc.Decode(b)
+		if err != nil {
+			t.Fatalf("cannot decode: %v", err)
+		}
+
+		if tt.Method != "" {
+			err = msg2.ResponseAsMethod(tt.Method)
+			if err != nil {
+				t.Fatalf("cannot decode response part: %v", err)
+			}
+		}
+
+		if !reflect.DeepEqual(msg, msg2) {
+			t.Logf("not equal after reserialization: %#v != %#v", msg, msg2)
 		}
 	}
 }

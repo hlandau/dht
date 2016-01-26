@@ -1,11 +1,13 @@
 package dht
 
-import "io"
-import "net"
-import "crypto/rand"
-import "crypto/hmac"
-import "crypto/sha256"
-import "crypto/subtle"
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"io"
+	"net"
+)
 
 // Used to generate and verify tokens.
 type tokenStore struct {

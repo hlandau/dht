@@ -1,11 +1,13 @@
 package dht
 
-import "net"
-import "fmt"
-import "github.com/zeebo/bencode"
-import "encoding/binary"
-import "bytes"
-import "github.com/hlandau/dht/krpc"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"github.com/hlandau/dht/krpc"
+	"github.com/zeebo/bencode"
+	"net"
+)
 
 func init() {
 	krpc.RegisterQuery("ping", krPing{})
@@ -115,6 +117,10 @@ func (m *krAnnouncePeerRes) GetNodeID() NodeID {
 type NodeLocator struct {
 	NodeID NodeID      // Node ID
 	Addr   net.UDPAddr // DHT Node UDP IP:Port
+}
+
+func isValidAddress(addr net.UDPAddr) bool {
+	return !addr.IP.IsUnspecified() && addr.Port != 0
 }
 
 // An IPv4 node list is a string which is the concatenation of 26-byte

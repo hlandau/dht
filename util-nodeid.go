@@ -1,9 +1,11 @@
 package dht
 
-import "encoding/hex"
-import "encoding/json"
-import "fmt"
-import "crypto/rand"
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+)
 
 // Node ID. Binary form.
 type NodeID string

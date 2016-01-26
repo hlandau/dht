@@ -23,6 +23,7 @@ func (dht *DHT) lTxFindNode(n *node, target NodeID) error {
 	return dht.lTxQuery(n, "find_node", &krFindNodeReq{
 		ID:     dht.cfg.NodeID,
 		Target: target,
+		Want:   dht.wantList,
 	})
 }
 
@@ -31,6 +32,7 @@ func (dht *DHT) lTxGetPeers(n *node, infoHash InfoHash) error {
 	return dht.lTxQuery(n, "get_peers", &krGetPeersReq{
 		ID:       dht.cfg.NodeID,
 		InfoHash: infoHash,
+		Want:     dht.wantList,
 	})
 }
 

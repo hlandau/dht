@@ -1,8 +1,10 @@
 package dht
 
-import "net"
-import "time"
-import "github.com/hlandau/dht/krpc"
+import (
+	"github.com/hlandau/dht/krpc"
+	"net"
+	"time"
+)
 
 // Represents a known node in the DHT.
 type node struct {

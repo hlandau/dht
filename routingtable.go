@@ -30,7 +30,7 @@ func (rt *routingTable) Size() int {
 
 // Insert peer.
 func (rt *routingTable) Insert(n *node) {
-	if n.Addr.Port == 0 || n.Addr.IP.IsUnspecified() {
+	if !isValidAddress(n.Addr) {
 		panic("routingTable.Insert with nil peer")
 	}
 
