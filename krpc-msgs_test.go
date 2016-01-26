@@ -80,7 +80,7 @@ func TestKRPC(t *testing.T) {
 
 		msg2, err := krpc.Decode(b)
 		if err != nil {
-			t.Fatalf("cannot decode: %v", err)
+			t.Fatalf("cannot decode: %v: %v %v", err, string(b), tt.B)
 		}
 
 		if tt.Method != "" {

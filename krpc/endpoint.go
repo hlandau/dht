@@ -14,6 +14,10 @@ type Endpoint net.UDPAddr
 func (n Endpoint) MarshalBencode() ([]byte, error) {
 	var b [18]byte
 
+	if n.IP == nil {
+		return nil, nil
+	}
+
 	v4 := n.IP.To4()
 	if v4 != nil {
 		copy(b[:], v4)
@@ -24,6 +28,10 @@ func (n Endpoint) MarshalBencode() ([]byte, error) {
 	copy(b[0:16], n.IP.To16())
 	binary.BigEndian.PutUint16(b[16:18], uint16(n.Port))
 	return b[:], nil
+}
+
+func (n Endpoint) IsEmptyBencode() bool {
+	return n.IP == nil
 }
 
 func (n *Endpoint) UnmarshalBencode(b []byte) error {
