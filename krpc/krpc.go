@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	denet "github.com/hlandau/degoutils/net"
 	"github.com/hlandau/xlog"
-	"github.com/zeebo/bencode"
+	"github.com/hlandauf/bencode"
 	"net"
 	"reflect"
 	"sync/atomic"

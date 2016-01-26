@@ -2,7 +2,7 @@ package dht
 
 import (
 	"github.com/hlandau/dht/krpc"
-	"github.com/zeebo/bencode"
+	"github.com/hlandauf/bencode"
 	"reflect"
 	"testing"
 )

@@ -3,7 +3,7 @@ package krpc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/zeebo/bencode"
+	"github.com/hlandauf/bencode"
 	"net"
 )
 

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/hlandau/dht/krpc"
-	"github.com/zeebo/bencode"
+	"github.com/hlandauf/bencode"
 	"net"
 )
 
