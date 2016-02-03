@@ -1,6 +1,7 @@
 package dht
 
 import (
+	"github.com/hlandau/degoutils/clock"
 	"github.com/hlandau/dht/krpc"
 	"net"
 	"time"
@@ -67,9 +68,9 @@ func (n *node) NeedsPing(cleanupPeriod time.Duration) bool {
 // Returns true if a node was contacted recently in relation to some infohash.
 func (n *node) WasContactedRecently(infoHash InfoHash, searchRetryPeriod time.Duration) bool {
 	t, ok := n.PastQueries[infoHash]
-	return ok && time.Since(t) > searchRetryPeriod
+	return ok && time.Since(t) < searchRetryPeriod
 }
 
-func (n *node) MarkContacted(infoHash InfoHash) {
-	n.PastQueries[infoHash] = time.Now()
+func (n *node) MarkContacted(c clock.Clock, infoHash InfoHash) {
+	n.PastQueries[infoHash] = c.Now()
 }

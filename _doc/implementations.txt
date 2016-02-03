@@ -1,0 +1,12 @@
+# Known BitTorrent Mainline DHT Implementations
+
+                                    v6  BEP44  SEC  ltCLID ltGP ltFC
+hlandau/dht             Go          Yes Yes    I  
+libtorrent              C++             Yes    IEC  Yes    Yes  Yes
+the8472/mldht (Vuze)    Java            Yes    I    Yes    Yes  Yes
+feross/bittorrent-dht   JavaScript      Yes
+uTorrent                Closed          Yes
+
+SEC suport: I - IP advertisement, E - Enforcement, C - will change node ID in
+response to advertisement or enforcement.
+

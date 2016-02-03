@@ -26,6 +26,16 @@ func ParseInfoHash(infoHash string) (InfoHash, error) {
 	return n, nil
 }
 
+// Parses an infohash. Panics on failure.
+func MustParseInfoHash(nodeID string) InfoHash {
+	n, err := ParseInfoHash(nodeID)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse infohash: %v", err))
+	}
+
+	return n
+}
+
 // Unmarshal from a hexadecimal infohash string.
 func (infoHash *InfoHash) UnmarshalString(s string) error {
 	b, err := hex.DecodeString(s)
@@ -44,6 +54,14 @@ func (infoHash *InfoHash) UnmarshalString(s string) error {
 // Returns the infohash in hexadecimal form.
 func (infoHash InfoHash) String() string {
 	return hex.EncodeToString([]byte(infoHash))
+}
+
+func (infoHash InfoHash) ShortString() string {
+	s := infoHash.String()
+	if len(s) == 0 {
+		return ""
+	}
+	return s[0:4] + ".." + s[36:40]
 }
 
 // True iff the infohash is the right length.

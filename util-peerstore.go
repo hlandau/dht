@@ -11,6 +11,9 @@ type peerSet struct {
 	// The set of values.
 	values map[string]struct{}
 
+	// Immutable/mutable datum, if present.
+	datum *Datum
+
 	// Needed to ensure different peers are returned each time.
 	ring *ring.Ring
 }
@@ -29,15 +32,25 @@ func (ps *peerSet) Next() []net.UDPAddr {
 		count = len(ps.values)
 	}
 
-	xs := make([]net.UDPAddr, 0, count)
+	xs := make([]net.UDPAddr, 0, count+1)
 	var next *ring.Ring
 	for i := 0; i < count; i++ {
 		next = ps.ring.Next()
-		xs = append(xs, next.Value.(net.UDPAddr))
 		ps.ring = next
+
+		xs = append(xs, next.Value.(net.UDPAddr))
 	}
 
 	return xs
+}
+
+func (ps *peerSet) Datum() *Datum {
+	return ps.datum
+}
+
+func (ps *peerSet) PutDatum(datum *Datum) bool {
+	ps.datum = datum
+	return true
 }
 
 // Add an address to the value set. Returns true if the address was not
@@ -95,7 +108,7 @@ func (ps *peerStore) Set(infoHash InfoHash) *peerSet {
 	return set.(*peerSet)
 }
 
-// Get number of known values for the given infohash.
+// Get number of known peer values for the given infohash.
 func (ps *peerStore) Count(infoHash InfoHash) int {
 	set := ps.Set(infoHash)
 	if set == nil {
@@ -105,7 +118,7 @@ func (ps *peerStore) Count(infoHash InfoHash) int {
 	return set.Size()
 }
 
-// Returns a random set of eight values for the given infohash.
+// Returns a random set of approximately eight values for the given infohash.
 func (ps *peerStore) Values(infoHash InfoHash) []net.UDPAddr {
 	set := ps.Set(infoHash)
 	if set == nil {
@@ -113,6 +126,15 @@ func (ps *peerStore) Values(infoHash InfoHash) []net.UDPAddr {
 	}
 
 	return set.Next()
+}
+
+func (ps *peerStore) Datum(infoHash InfoHash) *Datum {
+	set := ps.Set(infoHash)
+	if set == nil {
+		return nil
+	}
+
+	return set.Datum()
 }
 
 // Add the given address as a value for the provided infohash.
@@ -132,4 +154,15 @@ func (ps *peerStore) Add(infoHash InfoHash, addr net.UDPAddr) bool {
 	// Add/touch set in LRU cache and add address to set.
 	ps.values.Add(string(infoHash), set)
 	return set.Put(addr)
+}
+
+// Add the given datum as a value for the provided infohash.
+// Returns true if the datum was added.
+func (ps *peerStore) AddDatum(infoHash InfoHash, datum *Datum) bool {
+	set := ps.Set(infoHash)
+	if set == nil {
+		set = newValueSet()
+	}
+
+	return set.PutDatum(datum)
 }

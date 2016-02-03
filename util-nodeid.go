@@ -58,6 +58,14 @@ func (nid NodeID) String() string {
 	return hex.EncodeToString([]byte(nid))
 }
 
+func (nid NodeID) ShortString() string {
+	s := nid.String()
+	if len(s) == 0 {
+		return ""
+	}
+	return s[0:4] + ".." + s[36:40]
+}
+
 // True iff the node ID is the right length.
 func (nid NodeID) Valid() bool {
 	return len(nid) == NodeIDBytes

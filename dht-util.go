@@ -1,6 +1,8 @@
 package dht
 
 import (
+	"github.com/hlandau/degoutils/clock"
+	"github.com/hlandau/dht/krpc"
 	"net"
 	"time"
 )
@@ -30,14 +32,14 @@ func formNodeList(nodes []*node, ws []string, addr net.UDPAddr) (nodes4 krNodesI
 
 // Given a list of endpoints, a wants string, and the address the request was
 // received from, return a list of IPv4 and IPv6 peer addresses.
-func formPeerList(peerAddrs []net.UDPAddr, ws []string, addr net.UDPAddr) []krEndpoint {
-	var endpoints []krEndpoint
+func formPeerList(peerAddrs []net.UDPAddr, ws []string, addr net.UDPAddr) []krpc.Endpoint {
+	var endpoints []krpc.Endpoint
 	v4, v6 := wants(ws, addr)
 
 	for i := range peerAddrs {
 		is4 := peerAddrs[i].IP.To4() != nil
 		if (is4 && v4) || (!is4 && v6) {
-			endpoints = append(endpoints, krEndpoint(peerAddrs[i]))
+			endpoints = append(endpoints, krpc.Endpoint(peerAddrs[i]))
 		}
 	}
 
@@ -72,8 +74,8 @@ func hasItem(w []string, v string) bool {
 	return false
 }
 
-func timerAt(t time.Time) <-chan time.Time {
-	return time.After(t.Sub(time.Now()))
+func timerAt(c clock.Clock, t time.Time) <-chan time.Time {
+	return c.After(t.Sub(c.Now()))
 }
 
 // Set whether an infohash is one we announce for.
@@ -85,14 +87,26 @@ func (dht *DHT) lSetLocallyOriginated(infoHash InfoHash, announce bool) {
 	}
 }
 
-func (dht *DHT) needMorePeers() bool {
-	numPeers := dht.neighbourhood.routingTable.Size()
-	return numPeers < dht.cfg.MinNodes || numPeers*2 < dht.cfg.MaxNodes
+func (dht *DHT) lSetLocallyInterested(infoHash InfoHash, interested bool) {
+	if interested {
+		dht.locallyInterested[infoHash] = struct{}{}
+	} else {
+		delete(dht.locallyInterested, infoHash)
+	}
 }
 
-func (dht *DHT) acceptMorePeers() bool {
-	numPeers := dht.neighbourhood.routingTable.Size()
-	return numPeers < dht.cfg.MaxNodes
+func (dht *DHT) needMoreNodes() bool {
+	numNodes := dht.neighbourhood.routingTable.Size()
+	return numNodes < dht.cfg.MinNodes || numNodes*2 < dht.cfg.MaxNodes
+}
+
+func (dht *DHT) acceptMoreNodes() bool {
+	numNodes := dht.neighbourhood.routingTable.Size()
+	return numNodes < dht.cfg.MaxNodes
+}
+
+func (dht *DHT) needMorePeers(infoHash InfoHash) bool {
+	return dht.peerStore.Count(infoHash) < dht.cfg.NumTargetPeers
 }
 
 func (dht *DHT) peersFor(infoHash InfoHash) []net.UDPAddr {

@@ -36,6 +36,14 @@ func (dht *DHT) lTxGetPeers(n *node, infoHash InfoHash) error {
 	})
 }
 
+// Send a get command to a node.
+func (dht *DHT) lTxGet(n *node, target InfoHash) error {
+	return dht.lTxQuery(n, "get", &krGetReq{
+		ID:     dht.cfg.NodeID,
+		Target: target,
+	})
+}
+
 // Send an announce_peer command to a node.
 func (dht *DHT) lTxAnnouncePeer(n *node, infoHash InfoHash, token []byte) error {
 	return dht.lTxQuery(n, "announce_peer", &krAnnouncePeerReq{
@@ -45,6 +53,25 @@ func (dht *DHT) lTxAnnouncePeer(n *node, infoHash InfoHash, token []byte) error 
 		ImpliedPort: 1,
 		Port:        0,
 	})
+}
+
+// Send a put command to a node.
+func (dht *DHT) lTxPut(n *node, target InfoHash, token []byte, d *Datum) error {
+	req := &krPutReq{
+		ID:    dht.cfg.NodeID,
+		Token: token,
+		Value: d.Value,
+	}
+
+	if d.IsMutable() {
+		req.Key = d.Key
+		req.Salt = d.Salt
+		req.Signature = d.Signature
+		req.SequenceNo = new(uint64)
+		*req.SequenceNo = d.SequenceNo
+	}
+
+	return dht.lTxQuery(n, "put", req)
 }
 
 // Message writing.
@@ -67,6 +94,10 @@ func (dht *DHT) lTxQuery(n *node, method string, args interface{}) error {
 // Respond to a given query message.
 func (dht *DHT) lTxResponse(addr net.UDPAddr, q *krpc.Message, response interface{}) error {
 	return krpc.WriteResponse(dht.conn, addr, q, response)
+}
+
+func (dht *DHT) lTxError(addr net.UDPAddr, q *krpc.Message, errorCode int, errorMsg string) error {
+	return krpc.WriteError(dht.conn, addr, q, errorCode, errorMsg)
 }
 
 // Called when an address is deemed to be unreachable.

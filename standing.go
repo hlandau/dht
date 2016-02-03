@@ -22,11 +22,13 @@ type search struct {
 }
 
 func (s *search) loop() {
+	const searchFreq = 1 * time.Second
+
 	for {
 		s.dht.RequestPeers(s.infoHash, s.announce)
 
 		select {
-		case <-time.After(20 * time.Second):
+		case <-time.After(searchFreq):
 		case <-s.stopChan:
 			return
 		}

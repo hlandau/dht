@@ -1,10 +1,11 @@
 package dht
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"github.com/hlandau/dht/krpc"
+	"github.com/hlandau/eddsa"
 	"net"
-	"time"
 )
 
 // l: Handle a raw incoming packet. {{{2
@@ -17,16 +18,16 @@ func (dht *DHT) lRxPacket(data []byte, addr net.UDPAddr) error {
 
 	switch msg.Type {
 	case "q":
-		log.Debugf("cl lRxQuery %v %v", msg, addr)
+		//log.Debugf("cl(%v) lRxQuery %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxQuery(msg, addr)
 	case "r":
-		log.Tracef("cl lRxResponse %v %v", msg, addr)
+		//log.Tracef("cl(%v) lRxResponse %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxResponse(msg, addr)
 	case "e":
-		log.Debugf("cl lRxError %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxError %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxError(msg, addr)
 	default:
-		log.Warnf("unknown packet type received: %#v (from %v)", msg.Type, addr)
+		log.Warnf("unknown packet type received: %#v (from %v)", msg.Type, &addr)
 		return nil
 	}
 
@@ -38,29 +39,35 @@ func (dht *DHT) lRxPacket(data []byte, addr net.UDPAddr) error {
 func (dht *DHT) lRxQuery(msg *krpc.Message, addr net.UDPAddr) error {
 	nodeID, err := dht.lRxCheckNodeID(msg)
 	if err != nil {
-		log.Errore(err, "cl lRxCheckNodeID ", addr)
+		log.Errore(err, "cl lRxCheckNodeID ", &addr)
 		return err
 	}
 
 	// Make sure the peer exists so we can track responses.
 	n := dht.neighbourhood.routingTable.FindByAddress(addr)
-	if n == nil && dht.acceptMorePeers() {
+	if n == nil && dht.acceptMoreNodes() {
 		dht.lTxPingAddr(addr, nodeID)
 	}
 
 	switch v := msg.Args.(type) {
 	case *krPing:
-		log.Debugf("cl lRxPingReq %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxPingReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		return dht.lRxPingReq(v, msg, addr)
 	case *krGetPeersReq:
-		log.Debugf("cl lRxGetPeersReq %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxGetPeersReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		return dht.lRxGetPeersReq(v, msg, addr)
 	case *krFindNodeReq:
-		log.Debugf("cl lRxFindNodeReq %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxFindNodeReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		return dht.lRxFindNodeReq(v, msg, addr)
+	case *krGetReq:
+		log.Debugf("cl(%v), lRxGetReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
+		return dht.lRxGetReq(v, msg, addr)
 	case *krAnnouncePeerReq:
-		log.Debugf("cl lRxAnnouncePeerReq %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxAnnouncePeerReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		return dht.lRxAnnouncePeerReq(v, msg, addr)
+	case *krPutReq:
+		log.Debugf("cl(%v) lRxPutReq %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
+		return dht.lRxPutReq(v, msg, addr)
 	default:
 		log.Warnf("unknown query type received: %#v", msg.Method)
 		return nil
@@ -111,6 +118,27 @@ func (dht *DHT) lRxFindNodeReq(v *krFindNodeReq, msg *krpc.Message, addr net.UDP
 	return nil
 }
 
+var wantAll = []string{"n4", "n6"}
+
+// Handle an incoming get query.
+func (dht *DHT) lRxGetReq(v *krGetReq, msg *krpc.Message, addr net.UDPAddr) error {
+	res := &krGetRes{
+		ID:    dht.cfg.NodeID,
+		Token: dht.tokenStore.Generate(addr),
+	}
+
+	neighbours := dht.neighbourhood.routingTable.routingTree.Lookup(v.Target)
+	res.Nodes, res.Nodes6 = formNodeList(neighbours, wantAll, addr)
+
+	datum := dht.peerStore.Datum(v.Target)
+	if datum != nil {
+		res.Value = datum.Value
+	}
+
+	dht.lTxResponse(addr, msg, res)
+	return nil
+}
+
 // Handle an incoming announce_peer query.
 func (dht *DHT) lRxAnnouncePeerReq(v *krAnnouncePeerReq, msg *krpc.Message, addr net.UDPAddr) error {
 	if dht.tokenStore.Verify(v.Token, addr) {
@@ -122,12 +150,104 @@ func (dht *DHT) lRxAnnouncePeerReq(v *krAnnouncePeerReq, msg *krpc.Message, addr
 		dht.peerStore.Add(v.InfoHash, announceAddr)
 
 		n, _ := dht.neighbourhood.routingTable.Node(v.ID, addr)
-		n.LastRxTime = time.Now().Add(-dht.cfg.SearchRetryPeriod)
+		n.LastRxTime = dht.cfg.Clock.Now().Add(-dht.cfg.SearchRetryPeriod) // TODO: check this
+
+		if _, ok := dht.locallyInterested[v.InfoHash]; ok {
+			dht.peersChan <- PeerResult{
+				InfoHash: v.InfoHash,
+				Addr:     addr,
+			}
+		}
 	}
 
 	// "Always reply positively. jech says this is to avoid 'backtracking', not
 	// sure what that means."
 	dht.lTxResponse(addr, msg, &krAnnouncePeerRes{
+		ID: dht.cfg.NodeID,
+	})
+	return nil
+}
+
+const maxPutLen = 1000
+
+// Handle an incoming put query.
+func (dht *DHT) lRxPutReq(v *krPutReq, msg *krpc.Message, addr net.UDPAddr) error {
+	if !dht.tokenStore.Verify(v.Token, addr) {
+		dht.lTxError(addr, msg, 203, "bad token")
+		return nil
+	}
+
+	datum := &Datum{
+		Value:     v.Value,
+		Key:       v.Key,
+		Signature: v.Signature,
+		Salt:      v.Salt,
+	}
+
+	if len(datum.Value) > maxPutLen {
+		dht.lTxError(addr, msg, 205, "value too large")
+		return nil
+	}
+
+	if len(datum.Salt) > 64 {
+		dht.lTxError(addr, msg, 207, "salt too large")
+		return nil
+	}
+
+	if !datum.IsMutable() {
+		// The immutable case is simple.
+		h := sha1.New()
+		h.Write([]byte(fmt.Sprintf("%d:", len(datum.Value)) + datum.Value))
+		target := InfoHash(string(h.Sum(nil)))
+
+		dht.peerStore.AddDatum(target, datum)
+	} else {
+		// Mutable case.
+
+		if v.SequenceNo != nil {
+			datum.SequenceNo = *v.SequenceNo
+		}
+
+		h := sha1.New()
+		h.Write([]byte(datum.Key))
+		h.Write(datum.Salt)
+		keyTarget := InfoHash(string(h.Sum(nil)))
+
+		oldDatum := dht.peerStore.Datum(keyTarget)
+		if oldDatum != nil {
+			if oldDatum.SequenceNo >= datum.SequenceNo {
+				dht.lTxError(addr, msg, 302, "sequence number rollback not permitted")
+				return nil
+			}
+
+			if v.CAS != nil && *v.CAS != oldDatum.SequenceNo {
+				dht.lTxError(addr, msg, 301, "CAS mismatch")
+				return nil
+			}
+		}
+
+		tbs := fmt.Sprintf("3:seqi%de1:v%d:", datum.SequenceNo, len(v.Value)) + v.Value
+		if len(v.Salt) > 0 {
+			tbs = fmt.Sprintf("4:salt%d:", len(v.Salt)) + string(v.Salt) + tbs
+		}
+
+		// TODO check key is well formed
+		publicKey := eddsa.PublicKey{
+			Curve: eddsa.Ed25519(),
+			X:     []byte(datum.Key),
+		}
+		if !publicKey.Verify([]byte(tbs), []byte(datum.Signature)) {
+			dht.lTxError(addr, msg, 206, "bad signature")
+			return nil
+		}
+
+		dht.peerStore.AddDatum(keyTarget, datum)
+	}
+
+	n, _ := dht.neighbourhood.routingTable.Node(v.ID, addr)
+	n.LastRxTime = dht.cfg.Clock.Now().Add(-dht.cfg.SearchRetryPeriod) // TODO: check this
+
+	dht.lTxResponse(addr, msg, &krPutRes{
 		ID: dht.cfg.NodeID,
 	})
 	return nil
@@ -192,10 +312,10 @@ func (dht *DHT) lRxResponse(msg *krpc.Message, addr net.UDPAddr) error {
 		// Changed ID. TODO
 	}
 
-	n.LastRxTime = time.Now()
+	n.LastRxTime = dht.cfg.Clock.Now()
 
 	dht.neighbourhood.Upkeep(n)
-	if dht.needMorePeers() {
+	if dht.needMoreNodes() {
 		select {
 		case dht.recurseNodeChan <- n.NodeID:
 		default:
@@ -206,17 +326,23 @@ func (dht *DHT) lRxResponse(msg *krpc.Message, addr net.UDPAddr) error {
 	// Type-specific dispatch.
 	switch v := msg.Response.(type) {
 	case *krPing:
-		log.Debugf("cl lRxPingRes %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxPingRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxPingRes(v, msg, addr)
 	case *krGetPeersRes:
-		log.Debugf("cl lRxGetPeersRes %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxGetPeersRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxGetPeersRes(v, msg, addr)
 	case *krFindNodeRes:
-		log.Debugf("cl lRxFindNodeRes %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxFindNodeRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxFindNodeRes(v, msg, addr)
+	case *krGetRes:
+		log.Debugf("cl(%v) lRxGetRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
+		err = dht.lRxGetRes(v, msg, addr)
 	case *krAnnouncePeerRes:
-		log.Debugf("cl lRxAnnouncePeerRes %v %v", msg, addr)
+		log.Debugf("cl(%v) lRxAnnouncePeerRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
 		err = dht.lRxAnnouncePeerRes(v, msg, addr)
+	case *krPutRes:
+		log.Debugf("cl(%v) lRxPutRes %v %v", dht.cfg.NodeID.ShortString(), msg, &addr)
+		err = dht.lRxPutRes(v, msg, addr)
 	default:
 		log.Warnf("unknown response type received: %#v", msg.Method)
 	}
@@ -235,7 +361,7 @@ func (dht *DHT) lRxPingRes(v *krPing, msg *krpc.Message, addr net.UDPAddr) error
 // as a peer if applicable.
 func (dht *DHT) lRxGetPeersRes(v *krGetPeersRes, msg *krpc.Message, addr net.UDPAddr) error {
 	n, _ := dht.neighbourhood.routingTable.Node("", addr)
-	log.Debugf("cl lRxGetPeersRes %#v", n.PendingQueries[msg.TxID])
+	//log.Debugf("cl(%v) lRxGetPeersRes %#v", dht.cfg.NodeID.ShortString(), n.PendingQueries[msg.TxID])
 	q := n.PendingQueries[msg.TxID].Args.(*krGetPeersReq)
 	// We know p and q exist because these were checked earlier.
 
@@ -262,59 +388,6 @@ func (dht *DHT) lRxGetPeersRes(v *krGetPeersRes, msg *krpc.Message, addr net.UDP
 		}
 	}
 
-	var nodes []NodeLocator
-	nodes = append(nodes, []NodeLocator(v.Nodes)...)
-	nodes = append(nodes, []NodeLocator(v.Nodes6)...)
-	if len(nodes) == 0 {
-		return nil
-	}
-
-	for _, nodeLocator := range nodes {
-		if nodeLocator.NodeID == dht.cfg.NodeID {
-			// Ignore self.
-			continue
-		}
-
-		if !isValidAddress(nodeLocator.Addr) {
-			// Ignore invalid addresses.
-			continue
-		}
-
-		if dht.peerStore.Count(infoHash) >= dht.cfg.NumTargetPeers {
-			break
-		}
-
-		// Ignore items already in the routing table.
-		n2 := dht.neighbourhood.routingTable.FindByAddress(nodeLocator.Addr)
-		if n2 != nil {
-			continue
-		}
-
-		// Ignore references to ourself.
-		if nodeLocator.Addr.String() == dht.cfg.Address {
-			continue
-		}
-
-		n2, _ = dht.neighbourhood.routingTable.Node(nodeLocator.NodeID, nodeLocator.Addr)
-
-		if dht.peerStore.Count(infoHash) < dht.cfg.NumTargetPeers {
-			// Re-add the request to the queue.
-			//
-			// Announce has already been recorded via PeerStore.MarkLocallyOriginated,
-			// so it can be set to false here.
-			select {
-			case dht.requestPeersChan <- requestPeersInfo{
-				InfoHash: infoHash,
-				Announce: false,
-			}:
-			default:
-				// Channel full. The peer was already added to the routing table and will be
-				// used the next time RequestPeers is called if it is close enough to the
-				// infohash.
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -328,8 +401,19 @@ func (dht *DHT) lRxFindNodeRes(v *krFindNodeRes, msg *krpc.Message, addr net.UDP
 	return nil
 }
 
+func (dht *DHT) lRxGetRes(v *krGetRes, msg *krpc.Message, addr net.UDPAddr) error {
+	// TODO
+	return nil
+}
+
 // Handle an incoming announce_peer response. No-op.
 func (dht *DHT) lRxAnnouncePeerRes(v *krAnnouncePeerRes, msg *krpc.Message, addr net.UDPAddr) error {
+	// Nothing to do.
+	return nil
+}
+
+// Handle an incoming put response. No-op.
+func (dht *DHT) lRxPutRes(v *krPutRes, msg *krpc.Message, addr net.UDPAddr) error {
 	// Nothing to do.
 	return nil
 }

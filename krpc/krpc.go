@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	denet "github.com/hlandau/degoutils/net"
 	"github.com/hlandau/xlog"
 	"github.com/hlandauf/bencode"
@@ -31,6 +32,29 @@ type Message struct {
 	IP Endpoint `bencode:"ip,omitempty"`
 }
 
+func (m *Message) String() string {
+	switch m.Type {
+	case "q":
+		a := m.Args
+		method := ""
+		if a == nil {
+			a = fmt.Sprintf("%q", string(m.Args_))
+			method = m.Method + " "
+		}
+		return fmt.Sprintf("?(%x %v%v)", m.TxID, method, a)
+	case "r":
+		r := m.Response
+		if r == nil {
+			r = fmt.Sprintf("%q", string(m.Response_))
+		}
+		return fmt.Sprintf(".(%x %v)", m.TxID, r)
+	case "e":
+		return fmt.Sprintf("ERR!(%v)", m.Error)
+	default:
+		return fmt.Sprintf("kUnknown()")
+	}
+}
+
 // Send a query to a host.
 func MakeQuery(method string, args interface{}) (*Message, error) {
 	var txIDb [4]byte
@@ -55,7 +79,7 @@ func MakeQuery(method string, args interface{}) (*Message, error) {
 	return &msg, nil
 }
 
-func WriteResponse(conn *net.UDPConn, remoteAddr net.UDPAddr, q *Message, response interface{}) error {
+func WriteResponse(conn denet.UDPConn, remoteAddr net.UDPAddr, q *Message, response interface{}) error {
 	responseb, err := bencode.EncodeBytes(response)
 	if err != nil {
 		return err
@@ -70,7 +94,7 @@ func WriteResponse(conn *net.UDPConn, remoteAddr net.UDPAddr, q *Message, respon
 	return Write(conn, remoteAddr, &msg)
 }
 
-func WriteError(conn *net.UDPConn, remoteAddr net.UDPAddr, q *Message, errorCode int, errorMessage string) error {
+func WriteError(conn denet.UDPConn, remoteAddr net.UDPAddr, q *Message, errorCode int, errorMessage string) error {
 	msg := Message{
 		TxID: q.TxID,
 		Type: "e",
@@ -83,7 +107,7 @@ func WriteError(conn *net.UDPConn, remoteAddr net.UDPAddr, q *Message, errorCode
 }
 
 // Write a message to a host.
-func Write(conn *net.UDPConn, remoteAddr net.UDPAddr, msg *Message) error {
+func Write(conn denet.UDPConn, remoteAddr net.UDPAddr, msg *Message) error {
 	b := bytes.Buffer{}
 	err := bencode.NewEncoder(&b).Encode(msg)
 	if err != nil {
@@ -129,7 +153,7 @@ func decodeByType(b bencode.RawMessage, valueType reflect.Type) (interface{}, er
 }
 
 // Read a message from the connection.
-func Read(conn *net.UDPConn) (msg *Message, remoteAddr *net.UDPAddr, err error) {
+func Read(conn denet.UDPConn) (msg *Message, remoteAddr *net.UDPAddr, err error) {
 	buf, remoteAddr, err := denet.ReadDatagramFromUDP(conn)
 	if err != nil {
 		return
