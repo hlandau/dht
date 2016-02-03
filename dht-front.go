@@ -89,6 +89,16 @@ func (dht *DHT) RequestPeers(infoHash InfoHash, announce bool) error {
 	return nil
 }
 
+// TODO
+func (dht *DHT) RequestDatum(infoHash InfoHash) error {
+	return nil
+}
+
+// TODO
+func (dht *DHT) PutDatum(datum *Datum) error {
+	return nil
+}
+
 // Returns information on all known reachable nodes. Useful for saving the node
 // database to persistent storage.
 func (dht *DHT) ListReachableNodes() []NodeInfo {

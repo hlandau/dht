@@ -75,7 +75,7 @@ func GetNodeID(filename string) (dht.NodeID, error) {
 	return doc.NodeID, nil
 }
 
-// Load the current set of reachable DHT nodes to disk.
+// Load the current set of reachable DHT nodes from disk.
 func Load(filename string, dh *dht.DHT) error {
 	d, err := loadDoc(filename)
 	if err != nil {

@@ -93,3 +93,11 @@ func commonBits(x []byte, y []byte) int {
 
 	return 8*i + j
 }
+
+func hashDistance(id1 InfoHash, id2 InfoHash) string {
+	d := make([]byte, 20)
+	for i := 0; i < 20; i++ {
+		d[i] = id1[i] ^ id2[i]
+	}
+	return string(d)
+}
