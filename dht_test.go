@@ -2,9 +2,9 @@ package dht
 
 import (
 	"fmt"
-	"github.com/hlandau/degoutils/clock"
 	denet "github.com/hlandau/degoutils/net"
 	"github.com/hlandau/degoutils/net/mocknet"
+	"github.com/hlandau/goutils/clock"
 	"net"
 	"testing"
 	"time"

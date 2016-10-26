@@ -4,8 +4,8 @@
 package dht
 
 import (
-	"github.com/hlandau/degoutils/clock"
 	denet "github.com/hlandau/degoutils/net"
+	"github.com/hlandau/goutils/clock"
 	"github.com/hlandau/xlog"
 	"net"
 	"sync"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var log, Log = xlog.NewQuiet("dht")
+var log, Log = xlog.New("dht")
 
 // DHT structure, setup and teardown. {{{1
 

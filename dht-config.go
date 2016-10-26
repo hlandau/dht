@@ -1,8 +1,8 @@
 package dht
 
 import (
-	"github.com/hlandau/degoutils/clock"
 	denet "github.com/hlandau/degoutils/net"
+	"github.com/hlandau/goutils/clock"
 	"time"
 )
 
@@ -50,7 +50,7 @@ type Config struct {
 	// requests. If set, request peers of all supported address families (IPv4, IPv6).
 	AnyPeerAF bool `usage:"Return peers of all address families"`
 
-	// If set, this is used to get a listener instead of net.Listen.
+	// If set, this is used to get a listener instead of net.ListenUDP.
 	ListenFunc func(cfg *Config) (denet.UDPConn, error)
 
 	// If set, use this clock. Else use a realtime clock.

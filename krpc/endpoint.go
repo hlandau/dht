@@ -22,7 +22,7 @@ func (n Endpoint) MarshalBencode() ([]byte, error) {
 	if v4 != nil {
 		copy(b[:], v4)
 		binary.BigEndian.PutUint16(b[4:6], uint16(n.Port))
-		return b[0:6], nil
+		return bencode.EncodeBytes(b[0:6])
 	}
 
 	copy(b[0:16], n.IP.To16())

@@ -121,6 +121,7 @@ func Write(conn denet.UDPConn, remoteAddr net.UDPAddr, msg *Message) error {
 func Decode(b []byte) (msg *Message, err error) {
 	err = bencode.DecodeBytes(b, &msg)
 	if err != nil {
+		log.Debugf("decode error: %x", b)
 		return
 	}
 

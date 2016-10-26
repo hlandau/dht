@@ -1,8 +1,8 @@
 package dht
 
 import (
-	"github.com/hlandau/degoutils/clock"
 	"github.com/hlandau/dht/krpc"
+	"github.com/hlandau/goutils/clock"
 	"net"
 	"time"
 )
