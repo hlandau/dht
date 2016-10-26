@@ -208,6 +208,9 @@ func (dht *DHT) lRxPutReq(v *krPutReq, msg *krpc.Message, addr net.UDPAddr) erro
 			datum.SequenceNo = *v.SequenceNo
 		}
 
+		// Yes, it really is the case that mutable keys are hashed using the raw
+		// Ed25519 public key+salt whereas immutable keys are hashed using a
+		// bencoded value.
 		h := sha1.New()
 		h.Write([]byte(datum.Key))
 		h.Write(datum.Salt)
@@ -231,7 +234,11 @@ func (dht *DHT) lRxPutReq(v *krPutReq, msg *krpc.Message, addr net.UDPAddr) erro
 			tbs = fmt.Sprintf("4:salt%d:", len(v.Salt)) + string(v.Salt) + tbs
 		}
 
-		// TODO check key is well formed
+		if len(datum.Signature) != 64 || len(datum.Key) != 32 {
+			dht.lTxError(addr, msg, 206, "bad signature")
+			return nil
+		}
+
 		publicKey := eddsa.PublicKey{
 			Curve: eddsa.Ed25519(),
 			X:     []byte(datum.Key),
