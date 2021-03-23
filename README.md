@@ -1,4 +1,6 @@
-# BitTorrent Mainline DHT [![GoDoc](https://godoc.org/github.com/hlandau/dht?status.svg)](https://godoc.org/github.com/hlandau/dht)
+# BitTorrent Mainline DHT
+
+[![godocs.io](https://godocs.io/github.com/hlandau/dht?status.svg)](https://godocs.io/github.com/hlandau/dht) [![No modules](https://www.devever.net/~hl/f/no-modules2.svg) 100% modules-free.](https://www.devever.net/~hl/gomod)
 
 This is a BitTorrent Mainline DHT library. It is based on, and would not have
 been possible without, nictuku/dht. A major refactoring. Intended for
